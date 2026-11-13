@@ -286,10 +286,7 @@ class LFPluginCollWrapper:
                 if not self._collected_at_least_one_failure:
                     if not any(x.id in lastfailed for x in result):
                         return res
-                    self.lfplugin.config.pluginmanager.register(
-                        LFPluginCollSkipfiles(self.lfplugin), "lfplugin-collskip"
-                    )
-                    self._collected_at_least_one_failure = True
+                    self._start_skipping_files()
 
                 session = collector.session
                 result[:] = [
@@ -302,7 +299,21 @@ class LFPluginCollWrapper:
                     or isinstance(x, nodes.Collector)
                 ]
 
+        elif (
+            not self._collected_at_least_one_failure
+            and collector.path in self.lfplugin._last_failed_paths
+            and any(x.id in self.lfplugin.lastfailed for x in res.result)
+        ):
+            # Failures nested in a file (e.g. in a class) are only seen here.
+            self._start_skipping_files()
+
         return res
+
+    def _start_skipping_files(self) -> None:
+        self.lfplugin.config.pluginmanager.register(
+            LFPluginCollSkipfiles(self.lfplugin), "lfplugin-collskip"
+        )
+        self._collected_at_least_one_failure = True
 
 
 class LFPluginCollSkipfiles:

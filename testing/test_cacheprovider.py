@@ -985,6 +985,52 @@ class TestLastFailed:
             ]
         )
 
+    def test_lastfailed_skip_collection_failures_in_class(
+        self, pytester: Pytester
+    ) -> None:
+        """Check that file skipping works when the known failure is inside a class."""
+        pytester.makepyfile(
+            **{
+                "test_1.py": """
+                    class TestFoo:
+                        def test_pass(self): pass
+                        def test_fail(self): assert False
+                """,
+                "test_2.py": """
+                    def test_2(): pass
+                """,
+            }
+        )
+        result = pytester.runpytest()
+        result.stdout.fnmatch_lines(["collected 3 items", "*1 failed*2 passed*"])
+        result = pytester.runpytest("--lf")
+        result.stdout.fnmatch_lines(
+            [
+                "collected 2 items / 1 deselected / 1 selected",
+                "run-last-failure: rerun previous 1 failure (skipped 1 file)",
+                "*= 1 failed, 1 deselected in *",
+            ]
+        )
+
+        # The failed method is gone (stale entry): nothing is skipped.
+        pytester.makepyfile(
+            **{
+                "test_1.py": """
+                    class TestFoo:
+                        def test_pass(self): pass
+                        def test_renamed(self): pass
+                """,
+            }
+        )
+        result = pytester.runpytest("--lf")
+        result.stdout.fnmatch_lines(
+            [
+                "collected 3 items",
+                "run-last-failure: 1 known failures not in selected tests",
+                "*= 3 passed in *",
+            ]
+        )
+
     def test_lastfailed_with_known_failures_not_being_selected(
         self, pytester: Pytester
     ) -> None:
